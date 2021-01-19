@@ -1,0 +1,172 @@
+// CPC Watchdog 1.01
+// Blaise & Bruno 01-2021
+
+var SPREADSHEET_URL = "COPY_PASTE_YOUR_G_SHEET_URL" ; 
+var CPC_THRESHOLD = 2.00; // CPC limit
+ 
+function main() {
+ 
+  var ss = SpreadsheetApp.openByUrl(SPREADSHEET_URL);
+  var sheet = ss.getActiveSheet();
+  var header = ["Date",
+                "Campaign Name", 
+                "AdGroup Name",
+                "Keyword ",
+                "AverageCpc",
+                "Clicks"
+  ];
+ 
+  var campaignSelector = AdWordsApp.campaigns() ; //
+  var campaignIds=[];
+  var campaignIterator = campaignSelector.get();
+  while (campaignIterator.hasNext()) {    
+    var campaign = campaignIterator.next();
+    var campaignId = campaign.getId();
+    campaignIds.push(campaignId) ;      
+  }
+   
+  Logger.log(" # of campaign to check: "+campaignIds.length);
+ 
+  var single = [];
+  if (campaignIds.length > 0) {
+    single = singleCPCRetrieve(campaignIds);  // Get all clicks with CPCs >threshold for TODAY  
+  }
+  
+  Logger.log("Total # of Single: "+single.length);
+  
+  if (single.length > 0) { 
+    
+    var previous = ss.getSheetByName("LastFetch"); 
+    previous.activate();
+
+    var lastPrevious = previous.getLastRow();
+    
+    // Clear sheet content
+    var maxPrevious = previous.getMaxRows().toString();   
+    previous.getRange('A2:F'+ maxPrevious).clearContent();
+
+    // Populate "Last Fetch" with values from Today 
+    var previousRange = previous.getRange(2, 1, single.length, header.length);
+    previousRange.setValues(single);                          
+    
+    extractSingleCPCs(previous, sheet);
+    
+    removeDuplicates(ss); 
+    sheet.sort(5, false); // sort by CPC desc
+    
+    updatePrevious(ss); 
+    
+  }
+} 
+ 
+
+function removeDuplicates(ss) {
+
+  var sheet =  ss.getSheetByName("CPC Watchdog");
+  sheet.activate(); 
+  var data = sheet.getDataRange().getValues();
+  var newData = [];
+  
+  for (var i in data) {
+    var row = data[i];
+    var duplicate = false;
+    
+    for (var j in newData) {
+      
+      if (row.join() == newData[j].join()) {
+        duplicate = true;
+      }
+    }
+    if (!duplicate) {
+      newData.push(row);
+    }
+  }
+  
+  var length=sheet.getMaxRows().toString();
+  sheet.getRange('A1:F'+ length).clearContent();
+  sheet.getRange(1, 1, newData.length, newData[0].length).setValues(newData);
+}
+
+
+function singleCPCRetrieve(campaignIds) {
+  
+  var cpcThreshold = CPC_THRESHOLD * 1000000; 
+  var singleRow = [];
+       
+  var awq="SELECT Date, CampaignName, AdGroupName, Criteria, Id, AverageCpc, Clicks FROM KEYWORDS_PERFORMANCE_REPORT WHERE CampaignId IN ["+campaignIds.join(",")+"] AND AverageCpc > "+cpcThreshold+" DURING TODAY" ; // TODAY | 20210108,20210108
+   
+  var rows=AdWordsApp.report(awq, {
+       includeZeroImpressions: true,
+       returnMoneyInMicros: false,
+       }).rows() ;  
+  
+      Logger.log("SQL checkCPC: " +awq); 
+  
+  while (rows.hasNext()) {
+    var row = rows.next();
+    var day = row['Date'].toString().trim();
+    var campaignName = row['CampaignName'].toString().trim();
+    var adGroupName = row['AdGroupName'].toString().trim();
+    var keyword = row['Criteria'].toString().trim();
+    var AverageCPC=row['AverageCpc'].toString().replace(".", ",") ; // Format cell to French comma separator 
+    var clicks=row['Clicks'].toString().trim() ;
+    singleRow.push([day,campaignName, adGroupName, keyword, AverageCPC, clicks]) ;
+  }
+  
+  Logger.log("Single row: "+ singleRow);
+  
+  return singleRow;
+}
+
+
+function extractSingleCPCs(sheetPrevious, sheetCurrent) {
+  
+  var lastRow = sheetPrevious.getLastRow();
+  var count = sheetCurrent.getLastRow() + 1; // +1
+  
+  for (var i=1; i < lastRow ; i++) {
+    
+    var newData = [];
+    
+    for (var j=0; j<8 ; j++) {
+        newData[j] = sheetPrevious.getRange(i, j+1).getValue();
+    }
+       
+    var newRow = [];
+  
+    if (newData[7] > CPC_THRESHOLD) {         // If new Single CPC value
+        newData[4] = newData[7] ;             // Transfert it to main sheet
+      
+        Logger.log("SINGLE CPC from " + newData[5] + " click(s) | " + newData[3] + " | " + newData[4]);
+      
+        newData[5] = "1";                     // As single click
+        newData[6] = ""; newData[7] = "";     // Clear remaining columns
+        
+        newRow.push(newData);
+        sheetCurrent.getRange(count, 1, 1, 8).setValues(newRow); 
+        
+        count++ ;
+      }
+  }
+}
+
+function updatePrevious(ss) {
+  
+  var sourceSheet =  ss.getSheetByName("LastFetch");
+  sourceSheet.activate(); 
+  
+  var previousSheet =  ss.getSheetByName("Previous");
+  previousSheet.activate(); 
+  
+  var lengthSource = sourceSheet.getMaxRows().toString();
+  var source_range = sourceSheet.getRange('A1:F'+ lengthSource)
+  
+  var lengthPrevious=previousSheet.getMaxRows().toString();
+  previousSheet.getRange('A1:F' + lengthSource).clearContent();  
+  var target_range = previousSheet.getRange("A1:F"+lengthSource );
+  var values = source_range.getValues();
+  
+  target_range.setValues(values);
+  previousSheet.sort(5, false); // sort by CPC desc
+
+}
