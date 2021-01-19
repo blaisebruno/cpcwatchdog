@@ -93,7 +93,7 @@ function singleCPCRetrieve(campaignIds) {
   var cpcThreshold = CPC_THRESHOLD * 1000000; 
   var singleRow = [];
        
-  var awq="SELECT Date, CampaignName, AdGroupName, Criteria, Id, AverageCpc, Clicks FROM KEYWORDS_PERFORMANCE_REPORT WHERE CampaignId IN ["+campaignIds.join(",")+"] AND AverageCpc > "+cpcThreshold+" DURING TODAY" ; // TODAY | 20210108,20210108
+  var awq="SELECT Date, CampaignName, AdGroupName, Criteria, Id, AverageCpc, Clicks FROM KEYWORDS_PERFORMANCE_REPORT WHERE CampaignId IN ["+campaignIds.join(",")+"] AND AverageCpc > "+cpcThreshold+" DURING TODAY" ;
    
   var rows=AdWordsApp.report(awq, {
        includeZeroImpressions: true,
