@@ -2,6 +2,7 @@
 // Blaise & Bruno 01-2021
 
 var SPREADSHEET_URL = "COPY_PASTE_YOUR_G_SHEET_URL" ; 
+var CAMPAIGNLABEL= ""; //  monitor campaigns only with these labels
 var CPC_THRESHOLD = 2.00; // CPC limit
  
 function main() {
