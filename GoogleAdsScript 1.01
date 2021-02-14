@@ -16,7 +16,14 @@ function main() {
                 "Clicks"
   ];
  
-  var campaignSelector = AdWordsApp.campaigns() ; //
+  // campaigns to check
+  var campaignSelector = AdWordsApp.campaigns()
+    .withCondition("Status = ENABLED");
+  if (CAMPAIGNLABEL!="") {
+    campaignSelector=campaignSelector
+       .withCondition("LabelNames CONTAINS_ANY ['"+CAMPAIGNLABEL+"']");
+  }
+  
   var campaignIds=[];
   var campaignIterator = campaignSelector.get();
   while (campaignIterator.hasNext()) {    
